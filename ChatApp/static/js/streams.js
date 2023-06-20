@@ -1,4 +1,5 @@
 
+
 const APP_ID = '1e03b384b24c46b897418c330b247eec'
 const TOKEN = sessionStorage.getItem('token')
 const CHANNEL = sessionStorage.getItem('room')
@@ -25,6 +26,7 @@ let joinAndDisplayLocalStream = async () => {
     }
     
     localTracks = await AgoraRTC.createMicrophoneAndCameraTracks()
+    localTracks.push(document.getElementById('sign-btn'));
 
     let member = await createMember()
 
@@ -52,7 +54,7 @@ let handleUserJoined = async (user, mediaType) => {
 
         player = `<div  class="video-container" id="user-container-${user.uid}">
             <div class="video-player" id="user-${user.uid}"></div>
-            <div class="username-wrapper"><span class="user-name">${member.name}</span></div>
+            <div class="username-wrapper"><span class="user-name">"${member.name}"</span></div>
         </div>`
 
         document.getElementById('video-streams').insertAdjacentHTML('beforeend', player)
@@ -81,8 +83,76 @@ let leaveAndRemoveLocalStream = async () => {
     window.open('/', '_self')
 }
 
+async function enableCameraAccess() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      return stream;
+    } catch (error) {
+      console.error('Kamera erişimi hatası:', error);
+      return null;
+    }
+  }
+  
+  let isTrackEnabled = true;
+
+  let predictSignLanguage = async (e) => {
+    if (isTrackEnabled) {
+      isTrackEnabled = false;
+      e.target.style.backgroundColor = '#fff';
+    } else {
+      isTrackEnabled = true;
+      e.target.style.backgroundColor = 'rgb(255, 80, 80, 1)';
+  
+      let stream = await enableCameraAccess();
+      if (!stream) {
+        return;
+      }
+  
+      const videoTrack = stream.getVideoTracks()[0];
+      const imageCapture = new ImageCapture(videoTrack);
+  
+      const processFrame = async () => {
+        const imageBitmap = await imageCapture.grabFrame();
+        // ImageBitmap'i base64 formatına dönüştür
+        const canvas = document.createElement('canvas');
+        canvas.width = imageBitmap.width;
+        canvas.height = imageBitmap.height;
+        const context = canvas.getContext('2d');
+        context.drawImage(imageBitmap, 0, 0);
+        const base64Image = canvas.toDataURL('image/jpeg');
+  
+        const response = await fetch('/sign_prediction', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ image: base64Image })
+        });
+  
+        const data = await response.json();
+        console.log(data);
+  
+        // Yeni prediction değerini güncelle
+        const predictionElement = document.getElementById('sign');
+        predictionElement.textContent = data.prediction;
+  
+        // Yeni frame için işlemi tekrarla
+        if (isTrackEnabled) {
+          requestAnimationFrame(processFrame);
+        }
+      };
+  
+      // İlk frame için işlemi başlat
+      requestAnimationFrame(processFrame);
+    }
+  };
+  
+
+
+
 let toggleCamera = async (e) => {
     console.log('TOGGLE CAMERA TRIGGERED')
+    console.log('localtracks',localTracks)
     if(localTracks[1].muted){
         await localTracks[1].setMuted(false)
         e.target.style.backgroundColor = '#fff'
@@ -140,4 +210,5 @@ joinAndDisplayLocalStream()
 document.getElementById('leave-btn').addEventListener('click', leaveAndRemoveLocalStream)
 document.getElementById('camera-btn').addEventListener('click', toggleCamera)
 document.getElementById('mic-btn').addEventListener('click', toggleMic)
+document.getElementById('sign-btn').addEventListener('click',predictSignLanguage)
 

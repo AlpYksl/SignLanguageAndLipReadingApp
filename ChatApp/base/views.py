@@ -7,7 +7,12 @@ from .models import RoomMember
 import json
 from django.views.decorators.csrf import csrf_exempt
 
+import cv2
+import base64
+import numpy as np
+from django.http import JsonResponse
 
+import mediapipe as mp
 
 # Create your views here.
 
@@ -66,3 +71,37 @@ def deleteMember(request):
     )
     member.delete()
     return JsonResponse('Member deleted', safe=False)
+
+def process_video(image_base64):
+    # Base64 kodunu çöz
+    image_bytes = base64.b64decode(image_base64)
+    print("byte", image_bytes)
+    # Bytes verisini numpy dizisine dönüştür
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    print("array", image_array)
+    if image_array is not None:
+        return"prdictions"
+    else:
+        return image_array
+
+@csrf_exempt
+def signLanguagePrediction(request):
+   print("request:",request)
+   if request.method == 'POST':
+        print("gİRDİM")
+        # Görüntüyü al
+        data = json.loads(request.body)
+        
+        image_data = data.get('image')
+        
+        # Base64 kodunu çöz
+        image_bytes = base64.b64decode(image_data)
+        print("Selam")
+        # Görüntüyü modele gönder ve sonucu al
+        prediction = process_video(image_bytes)
+        print("Data3", prediction)
+        # Sonucu JSON formatında dön
+        return JsonResponse({'prediction': prediction})
+
+# def signLanguagePrediction(request):
+#     return JsonResponse({'prediction':"ASLAPSA"})
